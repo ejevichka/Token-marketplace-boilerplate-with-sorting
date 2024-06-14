@@ -1,23 +1,28 @@
 // components/TokenList.tsx
 import React, { useEffect, useState } from 'react';
-import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
 import Link from 'next/link';
-import useSWR from 'swr';
+import { useQuery, useQueryClient } from 'react-query';
 import { fetchTokens, TToken } from '~/lib/api';
 
-const TokenList = () => {
+const TokenList: React.FC = () => {
   const limit = 50;
   const [tokens, setTokens] = useState<TToken[]>([]);
   const [chains, setChains] = useState(''); // State for selected chains
   const [chainTypes, setChainTypes] = useState(''); // State for selected chainTypes
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetcher = (page: number, limit: number, chains: string, chainTypes: string) => 
+  const fetchTokensData = async (page: number, limit: number, chains: string, chainTypes: string) => 
     fetchTokens(page, limit, chains, chainTypes);
 
-  const { data, error } = useSWR(['tokens', page, limit, chains, chainTypes], () =>
-    fetcher(page, limit, chains, chainTypes)
+  const { data, error, isFetching } = useQuery(
+    ['tokens', page, limit, chains, chainTypes],
+    () => fetchTokensData(page, limit, chains, chainTypes),
+    {
+      keepPreviousData: true,
+    }
   );
 
   useEffect(() => {
@@ -40,11 +45,11 @@ const TokenList = () => {
 
   const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
     const token: TToken | undefined = tokens[index];
-    if (!token) return null; 
+    if (!token) return null;
     return (
       <div style={style} key={token.address} className="p-2 border-b">
         <Link href={`/token/${token.chainId}/${token.address}`}>
-          <img src={token.logoURI || '/default-logo.png'} alt={token.name} width="20" height="20" />
+          <img src={token.logoURI} alt={token.name} width="20" height="20" />
           {token.name}
         </Link>
       </div>
@@ -82,7 +87,7 @@ const TokenList = () => {
         itemSize={50} // height of each item
         width="100%"
         onItemsRendered={({ visibleStopIndex }) => {
-          if (visibleStopIndex >= tokens.length - 1 && !loading) {
+          if (visibleStopIndex >= tokens.length - 1 && !loading && !isFetching) {
             loadMoreTokens(); // Load more tokens when nearing the end
           }
         }}
