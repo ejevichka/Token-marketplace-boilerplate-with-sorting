@@ -1,50 +1,43 @@
-// components/TokenList.tsx
-import React, { useEffect, useState } from 'react';
-import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
-import Link from 'next/link';
-import useSWR from 'swr';
-import { fetchTokens, TToken } from '~/lib/api';
+import React, { useState, useMemo } from "react";
+import {
+  FixedSizeList as List,
+  type ListChildComponentProps,
+} from "react-window";
+import Link from "next/link";
+import { TToken, TTokenFilter } from "~/lib/api";
 
-const TokenList = () => {
-  const limit = 50;
-  const [tokens, setTokens] = useState<TToken[]>([]);
-  const [chains, setChains] = useState(''); // State for selected chains
-  const [chainTypes, setChainTypes] = useState(''); // State for selected chainTypes
+
+const TokenList = ({ data }: { data: TToken[] }) => {
+
+  const [filter, setFilter] = useState<TTokenFilter>({
+    chainId: 1,
+    chainType: "",
+  });
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(false);
 
-  const fetcher = (page: number, limit: number, chains: string, chainTypes: string) => 
-    fetchTokens(page, limit, chains, chainTypes);
+  const filteredData = useMemo(() => {
+    console.log("filter", filter)
+    return data.filter(token => {
+      return (
+        (!filter.chainId || token.chainId === filter.chainId) &&
+        (!filter.chainType || token.coinKey === filter.chainType)
+      );
+    });
+  }, [data, filter]);
 
-  const { data, error } = useSWR(['tokens', page, limit, chains, chainTypes], () =>
-    fetcher(page, limit, chains, chainTypes)
-  );
-
-  useEffect(() => {
-    if (data) {
-      setTokens((prevTokens) => [...prevTokens, ...data]);
-      setLoading(false);
-    }
-  }, [data]);
-
-  useEffect(() => {
-    setLoading(true);
-    setTokens([]);
-    setPage(0);
-  }, [chains, chainTypes]);
-
-  const loadMoreTokens = () => {
-    setLoading(true);
-    setPage((prevPage) => prevPage + 1);
-  };
 
   const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
-    const token: TToken | undefined = tokens[index];
-    if (!token) return null; 
+    const token: TToken | undefined = filteredData[index];
+    if (!token) return null;
     return (
-      <div style={style} key={token.address} className="p-2 border-b">
+      <div style={style} key={token.address} className="border-b p-2">
         <Link href={`/token/${token.chainId}/${token.address}`}>
-          <img src={token.logoURI || '/default-logo.png'} alt={token.name} width="20" height="20" />
+          <img
+            src={token.logoURI || "/default-logo.png"}
+            alt={token.name}
+            width="20"
+            height="20"
+          />
           {token.name}
         </Link>
       </div>
@@ -55,42 +48,49 @@ const TokenList = () => {
     <div>
       <div className="controls">
         <select
-          value={chains}
-          onChange={(e) => setChains(e.target.value)}
-          className="block w-full sm:inline-block sm:w-auto px-3 m-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          value={filter.chainId}
+          onChange={(e) =>
+            setFilter((prevFilter) => ({
+              ...prevFilter,
+              chainId: parseInt(e.target.value, 10),
+            }))
+          }
+          className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
-          <option value="">Select Chains</option>
+          <option value="0">Select Chains</option>
           <option value="1">Ethereum</option>
+          <option value="100">MakerDAO</option>
           <option value="137">Polygon</option>
-          {/* Add other chains as needed */}
+          <option value="137">Uniswap</option>       
         </select>
         <select
-          value={chainTypes}
-          onChange={(e) => setChainTypes(e.target.value)}
-          className="block w-full sm:inline-block sm:w-auto px-3 m-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          value={filter.chainType}
+          onChange={(e) =>
+            setFilter((prevFilter) => ({
+              ...prevFilter,
+              chainType: e.target.value,
+            }))
+          }
+          className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="">Select Chain Types</option>
           <option value="EVM">EVM</option>
           <option value="SVM">SVM</option>
-          {/* Add other chain types as needed */}
         </select>
       </div>
       <List
-        key={`${chains}-${chainTypes}-${tokens.length}`} // Use key to force re-render
-        height={600} // height of the list container
-        itemCount={tokens.length}
-        itemSize={50} // height of each item
+        height={600}
+        itemCount={data?.length || 0}
+        itemSize={50} 
         width="100%"
         onItemsRendered={({ visibleStopIndex }) => {
-          if (visibleStopIndex >= tokens.length - 1 && !loading) {
-            loadMoreTokens(); // Load more tokens when nearing the end
-          }
+          setPage((x) => x + 1);
         }}
       >
         {Row}
       </List>
-      {loading && <div>Loading more tokens...</div>}
-      {error && <div>Error loading tokens: {error.message}</div>}
+     {/*  {isLoading && <div>Loading more tokens...</div>}
+      {error && <div>Error loading tokens: {error.message}</div>} */}
     </div>
   );
 };
