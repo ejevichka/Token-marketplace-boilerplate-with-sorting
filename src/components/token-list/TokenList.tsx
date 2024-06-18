@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/router";
 import {
   FixedSizeList as List,
   type ListChildComponentProps,
@@ -28,10 +29,18 @@ const TokenList = ({ data }: { data: TToken[] }) => {
 
   const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
     const token: TToken | undefined = filteredData[index];
+    const router = useRouter();
     if (!token) return null;
+    const handleTokenClick = () => {
+      router.push({
+        pathname: `/token/${token.chainId}/${token.address}`,
+        query: { logoURI: token.logoURI, tokenName: token.name },
+      });
+    };
+
     return (
       <div style={style} key={token.address} className="border-b p-2">
-        <Link href={`/token/${token.chainId}/${token.address}`}>
+        <div onClick={handleTokenClick} className="cursor-pointer">
           <img
             src={token.logoURI || "/default-logo.png"}
             alt={token.name}
@@ -39,7 +48,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
             height="20"
           />
           {token.name}
-        </Link>
+        </div>
       </div>
     );
   };

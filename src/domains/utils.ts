@@ -1,4 +1,4 @@
-import * as z from "zod";
+/* import * as z from "zod";
 
 export const errorLike = z.object({
   name: z.string().optional(),
@@ -14,3 +14,4 @@ export function extractErrorMessage(raw: unknown) {
   }
   return "Unhandled error occured";
 }
+ */
