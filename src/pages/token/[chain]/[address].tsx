@@ -1,7 +1,7 @@
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from 'next';
 import { useState, useEffect } from 'react';
 import cache from '~/utils/cache';
-import { TToken } from '~/lib/api';
+import { TToken, fetchTokens } from '~/lib/api';
 
 type TokenDetailPageProps = {
   token: {
@@ -14,15 +14,7 @@ type TokenDetailPageProps = {
 
 export const getStaticPaths: GetStaticPaths = async () => {
   try {
-    const res = await fetch('https://li.quest/v1/tokens');
-    if (!res.ok) {
-      throw new Error(`Failed to fetch tokens: ${res.statusText}`);
-    }
-    const data = await res.json();
-    const tokenData = data.tokens;
-    const tokensArray = Object.values(tokenData).flat() as TToken[];
-
-    // Generate paths for a subset of tokens, e.g., the first 100 tokens
+    const tokensArray = await fetchTokens();
     const paths = tokensArray.slice(0, 100).map((token) => ({
       params: {
         chain: token.chainId.toString(),
@@ -46,13 +38,7 @@ export const getStaticPaths: GetStaticPaths = async () => {
 export const getStaticProps: GetStaticProps<TokenDetailPageProps> = async ({ params }) => {
   try {
     const { chain, address } = params as { chain: string; address: string };
-    const res = await fetch('https://li.quest/v1/tokens');
-    if (!res.ok) {
-      throw new Error(`Failed to fetch tokens: ${res.statusText}`);
-    }
-    const data = await res.json();
-    const tokenData = data.tokens;
-    const tokensArray: TToken[] = Object.values(tokenData).flat() as TToken[];
+    const tokensArray = await fetchTokens();
     const token = tokensArray.find(
       (t) => t.chainId.toString() === chain && t.address === address
     );
@@ -66,7 +52,7 @@ export const getStaticProps: GetStaticProps<TokenDetailPageProps> = async ({ par
         token: {
           chain: token.chainId,
           address: token.address,
-          logoURI: token.logoURI || '/default-logo.png',
+          logoURI: token.logoURI || '',
           tokenName: token.name,
         },
       },
@@ -82,7 +68,7 @@ const TokenDetailPage = ({ token }: InferGetStaticPropsType<typeof getStaticProp
   const { chain, address, logoURI, tokenName } = token;
   const [isFavorite, setIsFavorite] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
     const favoriteTokens = cache.get('favoriteTokens') || new Set();
     const isFav = favoriteTokens.has(address);
     setIsFavorite(isFav);
@@ -100,14 +86,14 @@ const TokenDetailPage = ({ token }: InferGetStaticPropsType<typeof getStaticProp
   };
 
   return (
-    <div>
-      <h1>{tokenName}</h1>
-      <img src={logoURI} alt={tokenName} />
-      <p>Address: {address}</p>
-      <p>Chain ID: {chain}</p>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">{tokenName}</h1>
+      <img src={logoURI || "/default-logo.png"} alt={tokenName} className="w-20 h-20 rounded-full object-cover mb-4" />
+      <p className="mb-2"><span className="font-bold">Address:</span> {address}</p>
+      <p className="mb-4"><span className="font-bold">Chain ID:</span> {chain}</p>
       <button
         onClick={handleFavoriteClick}
-        className={`p-2 mt-4 ${isFavorite ? 'bg-red-500' : 'bg-green-500'} text-white`}
+        className={`px-4 py-2 rounded-md ${isFavorite ? 'bg-red-500' : 'bg-green-500'} text-white`}
       >
         {isFavorite ? 'Unmark as Favorite' : 'Mark as Favorite'}
       </button>

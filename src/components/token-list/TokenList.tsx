@@ -1,57 +1,44 @@
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/router";
+import React, { useState, useMemo, useEffect } from "react";
+import cache from '~/utils/cache';
 import {
   FixedSizeList as List,
   type ListChildComponentProps,
 } from "react-window";
-import Link from "next/link";
 import { TToken, TTokenFilter } from "~/lib/api";
-
+import TokenRow from "~/components/token-list/Row"
 
 const TokenList = ({ data }: { data: TToken[] }) => {
-
   const [filter, setFilter] = useState<TTokenFilter>({
     chainId: 1,
     chainType: "",
   });
-  const [page, setPage] = useState(0);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  const filteredData = useMemo(() => {
-    console.log("filter", filter)
-    return data.filter(token => {
+  useEffect(() => {
+    const favoriteTokens = cache.get('favoriteTokens') || new Set();
+    setFavorites(favoriteTokens);
+  }, []);
+
+
+  const filteredAndSortedData = useMemo(() => {
+    const filteredTokens: TToken[] = data.filter( token => {
       return (
         (!filter.chainId || token.chainId === filter.chainId) &&
         (!filter.chainType || token.coinKey === filter.chainType)
       );
-    });
-  }, [data, filter]);
-
-
-  const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
-    const token: TToken | undefined = filteredData[index];
-    const router = useRouter();
-    if (!token) return null;
-    const handleTokenClick = () => {
-      router.push({
-        pathname: `/token/${token.chainId}/${token.address}`,
-        query: { logoURI: token.logoURI, tokenName: token.name },
       });
-    };
+  
+    const favoriteTokens: TToken[] = filteredTokens.filter(token => favorites.has(token.address));
+    const nonFavoriteTokens: TToken[] = filteredTokens.filter(token => !favorites.has(token.address));
+    return [...favoriteTokens, ...nonFavoriteTokens];
+  }, [data, filter, favorites]);
 
-    return (
-      <div style={style} key={token.address} className="border-b p-2">
-        <div onClick={handleTokenClick} className="cursor-pointer">
-          <img
-            src={token.logoURI || "/default-logo.png"}
-            alt={token.name}
-            width="20"
-            height="20"
-          />
-          {token.name}
-        </div>
-      </div>
-    );
+  const renderRow = ({ index, style }: ListChildComponentProps) => {
+    const token = filteredAndSortedData[index];
+    const isFavorite = token ? favorites.has(token.address) : false;
+    return <TokenRow index={index} style={style} data={token as TToken} isFavorite={isFavorite} />;
   };
+
 
   return (
     <div>
@@ -69,8 +56,8 @@ const TokenList = ({ data }: { data: TToken[] }) => {
           <option value="0">Select Chains</option>
           <option value="1">Ethereum</option>
           <option value="100">MakerDAO</option>
-          <option value="137">Polygon</option>
-          <option value="137">Uniswap</option>       
+          <option value="137">Polygon</option> 
+          <option></option>     
         </select>
         <select
           value={filter.chainType}
@@ -89,17 +76,12 @@ const TokenList = ({ data }: { data: TToken[] }) => {
       </div>
       <List
         height={600}
-        itemCount={data?.length || 0}
-        itemSize={50} 
+        itemCount={filteredAndSortedData.length}
+        itemSize={70}
         width="100%"
-        onItemsRendered={({ visibleStopIndex }) => {
-          setPage((x) => x + 1);
-        }}
       >
-        {Row}
+        {renderRow}
       </List>
-     {/*  {isLoading && <div>Loading more tokens...</div>}
-      {error && <div>Error loading tokens: {error.message}</div>} */}
     </div>
   );
 };

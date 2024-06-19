@@ -23,35 +23,14 @@ export const TokenFilterSchema = z.object({
 });
 
 export type TTokenFilter = z.infer<typeof TokenFilterSchema>;
-const allTokensPromise = fetchAllTokens();
 
-export const fetchTokens = async (
-  page: number,
-  limit: number,
-  filter: TTokenFilter,
-): Promise<TToken[]> => {
-  try {
-    const response = await allTokensPromise;
-    const offset = page * limit;
-    return response.slice(offset, offset + limit);
-  } catch (error) {
-    console.error("Fetch error:", error);
-    throw error;
+export const fetchTokens = async () => {
+  const res = await fetch(API_URL);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tokens: ${res.statusText}`);
   }
+  const data = await res.json();
+  const tokenData = data.tokens;
+  const tokensArray = Object.values(tokenData).flat().map((x) => TokenSchema.parse(x)) as TToken[];
+  return tokensArray;
 };
-
-
-
-
-export async function fetchAllTokens() {
-  const response = await fetch(API_URL);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(`Failed to tokens, received status ${response.status}`);
-  }
-
-  return Object.values(data.tokens)
-    .flat()
-    .map((x) => TokenSchema.parse(x));
-}
