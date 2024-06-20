@@ -2,8 +2,6 @@ import { type AppType } from "next/app";
 import { Chakra_Petch } from "next/font/google";
 import Layout from "./layout";
 
-import { api } from "~/utils/api";
-
 import "~/styles/globals.css";
 
 const inter = Chakra_Petch({

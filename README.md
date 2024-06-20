@@ -42,8 +42,14 @@ Scalability: Using ISR with a subset of pre-generated paths allows the applicati
 
 # Future Enhancements
 Utilizing @lifi/data-types
-To ensure more precise data validation and typing, the @lifi/data-types package will be integrated into the project. This package provides robust TypeScript definitions and schemas that can enhance the accuracy of data handling and reduce runtime errors. This is a good practice for maintaining data integrity and ensuring consistency across different parts of the application. 
+To ensure more precise data validation and typing, the @lifi/data-types package will be integrated into the project. This package provides robust TypeScript definitions and schemas that can enhance the accuracy of data handling and reduce runtime errors. This is a good practice for maintaining data integrity and ensuring consistency across different parts of the application.
 
 Considering Li.Fi SDK
 As a potential enhancement, the Li.Fi SDK could be utilized to leverage advanced features and functionalities offered by the Li.Fi platform. This SDK can provide streamlined access to various DeFi and cross-chain services, enhancing the application's capabilities and user experience. Adding this to the project roadmap will allow for future-proofing and scalability.
+
+TODO:
+add turbopack
+vercel setups (linters)
+Testing - playright e2e testing
+Unit testing
 

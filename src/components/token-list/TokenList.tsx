@@ -51,6 +51,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
               chainId: parseInt(e.target.value, 10),
             }))
           }
+          data-testid="chain-id-select"
           className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="0">Select Chains</option>
@@ -67,6 +68,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
               chainType: e.target.value,
             }))
           }
+          data-testid="chain-type-select"
           className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="">Select Chain Types</option>
