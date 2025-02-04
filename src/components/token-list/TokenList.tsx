@@ -6,6 +6,16 @@ import {
 } from "react-window";
 import { TToken, TTokenFilter } from "~/lib/api";
 import TokenRow from "~/components/token-list/Row"
+import { ChainId } from "@lifi/types"
+
+
+const chainOptions = Object.entries(ChainId)
+  .filter(([key, value]) => typeof value === 'number')
+  .map(([key, value]) => (
+    <option key={value as number} value={value as number}>
+      {key}
+    </option>
+  ));
 
 const TokenList = ({ data }: { data: TToken[] }) => {
   const [filter, setFilter] = useState<TTokenFilter>({
@@ -24,7 +34,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
     const filteredTokens: TToken[] = data.filter( token => {
       return (
         (!filter.chainId || token.chainId === filter.chainId) &&
-        (!filter.chainType || token.coinKey === filter.chainType)
+        (!filter.chainType || token.chainType === filter.chainType)
       );
       });
   
@@ -55,9 +65,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
           className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="0">Select Chains</option>
-          <option value="1">Ethereum</option>
-          <option value="100">MakerDAO</option>
-          <option value="137">Polygon</option> 
+          {chainOptions}
           <option></option>     
         </select>
         <select
