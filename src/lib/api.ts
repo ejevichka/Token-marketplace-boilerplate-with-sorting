@@ -1,46 +1,65 @@
-import axios from 'axios';
-import * as z from 'zod';
+import * as z from "zod";
 import { EVMAddress } from "~/domains/evm";
+import {ExtendedChain} from "@lifi/types";
 
-const API_URL = 'https://li.quest/v1/tokens';
+const API_URL = "https://li.quest/v1/tokens";
+const CHAIN_API_URL = 'https://li.quest/v1/chains';
 
-const TokenSchema = z.object({
-    address: EVMAddress,
-    chainId:  z.number(), // TODO EVMChainId gives error "Expected string, received number"
-    coinKey: z.string().optional(),
-    decimals: z.number(),
-    logoURI: z.string().optional(),
-    name: z.string(),
-    priceUSD: z.string(),
-    symbol: z.string(),
-  });
+
+// @todo find this model in LIFI codebase
+export const TokenSchema = z.object({
+  address: EVMAddress,
+  chainId: z.number(), // TODO EVMChainId gives error "Expected string, received number"
+  coinKey: z.string().optional(),
+  decimals: z.number(),
+  logoURI: z.string().optional(),
+  name: z.string(),
+  priceUSD: z.string(),
+  symbol: z.string(),
+  chainType: z.string().optional()
+});
 
 export type TToken = z.infer<typeof TokenSchema>;
 
-export const fetchTokens = async (page: number, limit: number, chains = '', chainTypes = ''): Promise<TToken[]> => {
-  const params: any = {
-    limit,
-    offset: page * limit,
-  };
+export const TokenFilterSchema = z.object({
+  chainId: z.number(),
+  chainType: z.string(),
+});
 
-  if (chains) {
-    params.chains = chains;
+export type TTokenFilter = z.infer<typeof TokenFilterSchema>;
+
+const fetchChainData = async (): Promise<{ [key: number]: string }> => {
+  const res = await fetch(`${CHAIN_API_URL}?chainTypes=EVM%2CSVM`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch chain data: ${res.statusText}`);
   }
+  const data = await res.json();
+  const chainData: ExtendedChain[] = data.chains;
 
-  if (chainTypes) {
-    params.chainTypes = chainTypes;
+  const chainTypeMapping: { [key: number]: string } = {};
+  chainData.forEach((chain) => {
+    chainTypeMapping[chain.id] = chain.chainType;
+  });
+
+  return chainTypeMapping;
+};
+
+export const fetchTokens = async (): Promise<TToken[]> => {
+  const chainTypeMapping = await fetchChainData();
+
+  const res = await fetch(`${API_URL}?chainTypes=EVM%2CSVM`);  // By default API returns only EVM tokens
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tokens: ${res.statusText}`);
   }
+  const data = await res.json();
+  const tokenData = data.tokens;
 
-  try {
-    const response = await axios.get(API_URL, { params });
-    const data = response.data;
-    const tokensArray = Object.values(data.tokens).flat(); // Flatten the nested structure
-    // Validate the tokensArray using the TokenSchema
-    const validatedTokensArray = tokensArray.map((token: any) => TokenSchema.parse(token));
+  const tokensArray: TToken[] = Object.entries(tokenData).flatMap(([chainId, tokens]: [string, any]) => {
+    return tokens.map((token: any) => ({
+      ...token,
+      chainType: chainTypeMapping[parseInt(chainId, 10)] || 'Unknown',
+    }));
+  });
 
-    return validatedTokensArray;
-  } catch (error) {
-    console.error('Fetch error:', error);
-    throw error;
-  }
+  return tokensArray;
 };

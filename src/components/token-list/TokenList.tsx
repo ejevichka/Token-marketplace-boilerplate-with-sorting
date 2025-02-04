@@ -1,96 +1,97 @@
-// components/TokenList.tsx
-import React, { useEffect, useState } from 'react';
-import { FixedSizeList as List, type ListChildComponentProps } from 'react-window';
-import Link from 'next/link';
-import useSWR from 'swr';
-import { fetchTokens, TToken } from '~/lib/api';
+import React, { useState, useMemo, useEffect } from "react";
+import cache from '~/utils/cache';
+import {
+  FixedSizeList as List,
+  type ListChildComponentProps,
+} from "react-window";
+import { TToken, TTokenFilter } from "~/lib/api";
+import TokenRow from "~/components/token-list/Row"
+import { ChainId } from "@lifi/types"
 
-const TokenList = () => {
-  const limit = 50;
-  const [tokens, setTokens] = useState<TToken[]>([]);
-  const [chains, setChains] = useState(''); // State for selected chains
-  const [chainTypes, setChainTypes] = useState(''); // State for selected chainTypes
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(false);
 
-  const fetcher = (page: number, limit: number, chains: string, chainTypes: string) => 
-    fetchTokens(page, limit, chains, chainTypes);
+const chainOptions = Object.entries(ChainId)
+  .filter(([key, value]) => typeof value === 'number')
+  .map(([key, value]) => (
+    <option key={value as number} value={value as number}>
+      {key}
+    </option>
+  ));
 
-  const { data, error } = useSWR(['tokens', page, limit, chains, chainTypes], () =>
-    fetcher(page, limit, chains, chainTypes)
-  );
-
-  useEffect(() => {
-    if (data) {
-      setTokens((prevTokens) => [...prevTokens, ...data]);
-      setLoading(false);
-    }
-  }, [data]);
+const TokenList = ({ data }: { data: TToken[] }) => {
+  const [filter, setFilter] = useState<TTokenFilter>({
+    chainId: 1,
+    chainType: "",
+  });
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setLoading(true);
-    setTokens([]);
-    setPage(0);
-  }, [chains, chainTypes]);
+    const favoriteTokens = cache.get('favoriteTokens') || new Set();
+    setFavorites(favoriteTokens);
+  }, []);
 
-  const loadMoreTokens = () => {
-    setLoading(true);
-    setPage((prevPage) => prevPage + 1);
+
+  const filteredAndSortedData = useMemo(() => {
+    const filteredTokens: TToken[] = data.filter( token => {
+      return (
+        (!filter.chainId || token.chainId === filter.chainId) &&
+        (!filter.chainType || token.chainType === filter.chainType)
+      );
+      });
+  
+    const favoriteTokens: TToken[] = filteredTokens.filter(token => favorites.has(token.address));
+    const nonFavoriteTokens: TToken[] = filteredTokens.filter(token => !favorites.has(token.address));
+    return [...favoriteTokens, ...nonFavoriteTokens];
+  }, [data, filter, favorites]);
+
+  const renderRow = ({ index, style }: ListChildComponentProps) => {
+    const token = filteredAndSortedData[index];
+    const isFavorite = token ? favorites.has(token.address) : false;
+    return <TokenRow index={index} style={style} data={token as TToken} isFavorite={isFavorite} />;
   };
 
-  const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
-    const token: TToken | undefined = tokens[index];
-    if (!token) return null; 
-    return (
-      <div style={style} key={token.address} className="p-2 border-b">
-        <Link href={`/token/${token.chainId}/${token.address}`}>
-          <img src={token.logoURI || '/default-logo.png'} alt={token.name} width="20" height="20" />
-          {token.name}
-        </Link>
-      </div>
-    );
-  };
 
   return (
     <div>
       <div className="controls">
         <select
-          value={chains}
-          onChange={(e) => setChains(e.target.value)}
-          className="block w-full sm:inline-block sm:w-auto px-3 m-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          value={filter.chainId}
+          onChange={(e) =>
+            setFilter((prevFilter) => ({
+              ...prevFilter,
+              chainId: parseInt(e.target.value, 10),
+            }))
+          }
+          data-testid="chain-id-select"
+          className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
-          <option value="">Select Chains</option>
-          <option value="1">Ethereum</option>
-          <option value="137">Polygon</option>
-          {/* Add other chains as needed */}
+          <option value="0">Select Chains</option>
+          {chainOptions}
+          <option></option>     
         </select>
         <select
-          value={chainTypes}
-          onChange={(e) => setChainTypes(e.target.value)}
-          className="block w-full sm:inline-block sm:w-auto px-3 m-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          value={filter.chainType}
+          onChange={(e) =>
+            setFilter((prevFilter) => ({
+              ...prevFilter,
+              chainType: e.target.value,
+            }))
+          }
+          data-testid="chain-type-select"
+          className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="">Select Chain Types</option>
           <option value="EVM">EVM</option>
           <option value="SVM">SVM</option>
-          {/* Add other chain types as needed */}
         </select>
       </div>
       <List
-        key={`${chains}-${chainTypes}-${tokens.length}`} // Use key to force re-render
-        height={600} // height of the list container
-        itemCount={tokens.length}
-        itemSize={50} // height of each item
+        height={600}
+        itemCount={filteredAndSortedData.length}
+        itemSize={70}
         width="100%"
-        onItemsRendered={({ visibleStopIndex }) => {
-          if (visibleStopIndex >= tokens.length - 1 && !loading) {
-            loadMoreTokens(); // Load more tokens when nearing the end
-          }
-        }}
       >
-        {Row}
+        {renderRow}
       </List>
-      {loading && <div>Loading more tokens...</div>}
-      {error && <div>Error loading tokens: {error.message}</div>}
     </div>
   );
 };
