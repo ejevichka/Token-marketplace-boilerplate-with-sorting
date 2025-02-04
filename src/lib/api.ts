@@ -1,7 +1,10 @@
 import * as z from "zod";
 import { EVMAddress } from "~/domains/evm";
+import {ExtendedChain} from "@lifi/types";
 
 const API_URL = "https://li.quest/v1/tokens";
+const CHAIN_API_URL = 'https://li.quest/v1/chains';
+
 
 // @todo find this model in LIFI codebase
 export const TokenSchema = z.object({
@@ -13,6 +16,7 @@ export const TokenSchema = z.object({
   name: z.string(),
   priceUSD: z.string(),
   symbol: z.string(),
+  chainType: z.string().optional()
 });
 
 export type TToken = z.infer<typeof TokenSchema>;
@@ -23,35 +27,39 @@ export const TokenFilterSchema = z.object({
 });
 
 export type TTokenFilter = z.infer<typeof TokenFilterSchema>;
-const allTokensPromise = fetchAllTokens();
 
-export const fetchTokens = async (
-  page: number,
-  limit: number,
-  filter: TTokenFilter,
-): Promise<TToken[]> => {
-  try {
-    const response = await allTokensPromise;
-    const offset = page * limit;
-    return response.slice(offset, offset + limit);
-  } catch (error) {
-    console.error("Fetch error:", error);
-    throw error;
+const fetchChainData = async (): Promise<{ [key: number]: string }> => {
+  const res = await fetch(`${CHAIN_API_URL}?chainTypes=EVM%2CSVM`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch chain data: ${res.statusText}`);
   }
+  const data = await res.json();
+  const chainData: ExtendedChain[] = data.chains;
+
+  const chainTypeMapping: { [key: number]: string } = {};
+  chainData.forEach((chain) => {
+    chainTypeMapping[chain.id] = chain.chainType;
+  });
+
+  return chainTypeMapping;
 };
 
+export const fetchTokens = async (): Promise<TToken[]> => {
+  const chainTypeMapping = await fetchChainData();
 
-
-
-export async function fetchAllTokens() {
-  const response = await fetch(API_URL);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(`Failed to tokens, received status ${response.status}`);
+  const res = await fetch(`${API_URL}?chainTypes=EVM%2CSVM`);  // By default API returns only EVM tokens
+  if (!res.ok) {
+    throw new Error(`Failed to fetch tokens: ${res.statusText}`);
   }
+  const data = await res.json();
+  const tokenData = data.tokens;
 
-  return Object.values(data.tokens)
-    .flat()
-    .map((x) => TokenSchema.parse(x));
-}
+  const tokensArray: TToken[] = Object.entries(tokenData).flatMap(([chainId, tokens]: [string, any]) => {
+    return tokens.map((token: any) => ({
+      ...token,
+      chainType: chainTypeMapping[parseInt(chainId, 10)] || 'Unknown',
+    }));
+  });
+
+  return tokensArray;
+};

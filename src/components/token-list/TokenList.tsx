@@ -1,57 +1,54 @@
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/router";
+import React, { useState, useMemo, useEffect } from "react";
+import cache from '~/utils/cache';
 import {
   FixedSizeList as List,
   type ListChildComponentProps,
 } from "react-window";
-import Link from "next/link";
 import { TToken, TTokenFilter } from "~/lib/api";
+import TokenRow from "~/components/token-list/Row"
+import { ChainId } from "@lifi/types"
 
+
+const chainOptions = Object.entries(ChainId)
+  .filter(([key, value]) => typeof value === 'number')
+  .map(([key, value]) => (
+    <option key={value as number} value={value as number}>
+      {key}
+    </option>
+  ));
 
 const TokenList = ({ data }: { data: TToken[] }) => {
-
   const [filter, setFilter] = useState<TTokenFilter>({
     chainId: 1,
     chainType: "",
   });
-  const [page, setPage] = useState(0);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  const filteredData = useMemo(() => {
-    console.log("filter", filter)
-    return data.filter(token => {
+  useEffect(() => {
+    const favoriteTokens = cache.get('favoriteTokens') || new Set();
+    setFavorites(favoriteTokens);
+  }, []);
+
+
+  const filteredAndSortedData = useMemo(() => {
+    const filteredTokens: TToken[] = data.filter( token => {
       return (
         (!filter.chainId || token.chainId === filter.chainId) &&
-        (!filter.chainType || token.coinKey === filter.chainType)
+        (!filter.chainType || token.chainType === filter.chainType)
       );
-    });
-  }, [data, filter]);
-
-
-  const Row: React.FC<ListChildComponentProps> = ({ index, style }) => {
-    const token: TToken | undefined = filteredData[index];
-    const router = useRouter();
-    if (!token) return null;
-    const handleTokenClick = () => {
-      router.push({
-        pathname: `/token/${token.chainId}/${token.address}`,
-        query: { logoURI: token.logoURI, tokenName: token.name },
       });
-    };
+  
+    const favoriteTokens: TToken[] = filteredTokens.filter(token => favorites.has(token.address));
+    const nonFavoriteTokens: TToken[] = filteredTokens.filter(token => !favorites.has(token.address));
+    return [...favoriteTokens, ...nonFavoriteTokens];
+  }, [data, filter, favorites]);
 
-    return (
-      <div style={style} key={token.address} className="border-b p-2">
-        <div onClick={handleTokenClick} className="cursor-pointer">
-          <img
-            src={token.logoURI || "/default-logo.png"}
-            alt={token.name}
-            width="20"
-            height="20"
-          />
-          {token.name}
-        </div>
-      </div>
-    );
+  const renderRow = ({ index, style }: ListChildComponentProps) => {
+    const token = filteredAndSortedData[index];
+    const isFavorite = token ? favorites.has(token.address) : false;
+    return <TokenRow index={index} style={style} data={token as TToken} isFavorite={isFavorite} />;
   };
+
 
   return (
     <div>
@@ -64,13 +61,12 @@ const TokenList = ({ data }: { data: TToken[] }) => {
               chainId: parseInt(e.target.value, 10),
             }))
           }
+          data-testid="chain-id-select"
           className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="0">Select Chains</option>
-          <option value="1">Ethereum</option>
-          <option value="100">MakerDAO</option>
-          <option value="137">Polygon</option>
-          <option value="137">Uniswap</option>       
+          {chainOptions}
+          <option></option>     
         </select>
         <select
           value={filter.chainType}
@@ -80,6 +76,7 @@ const TokenList = ({ data }: { data: TToken[] }) => {
               chainType: e.target.value,
             }))
           }
+          data-testid="chain-type-select"
           className="m-2 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:inline-block sm:w-auto sm:text-sm"
         >
           <option value="">Select Chain Types</option>
@@ -89,17 +86,12 @@ const TokenList = ({ data }: { data: TToken[] }) => {
       </div>
       <List
         height={600}
-        itemCount={data?.length || 0}
-        itemSize={50} 
+        itemCount={filteredAndSortedData.length}
+        itemSize={70}
         width="100%"
-        onItemsRendered={({ visibleStopIndex }) => {
-          setPage((x) => x + 1);
-        }}
       >
-        {Row}
+        {renderRow}
       </List>
-     {/*  {isLoading && <div>Loading more tokens...</div>}
-      {error && <div>Error loading tokens: {error.message}</div>} */}
     </div>
   );
 };
